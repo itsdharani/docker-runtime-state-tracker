@@ -1,0 +1,26 @@
+services:
+
+  frontend:
+    image: nginx:latest
+    depends_on:
+      - api
+
+  api:
+    image: nginx:latest
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: demo
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  redis:
+    image: redis:8
+
+volumes:
+  postgres_data:
