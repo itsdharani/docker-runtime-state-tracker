@@ -8,8 +8,18 @@
 ```mermaid
 flowchart TD
     A[Docker] --> B[docker events]
-    B --> C[Python collector]
-    C --> D[PostgreSQL + MongoDB]
+    B --> C[Python Collector]
+
+    C --> D[PostgreSQL<br/>structured data]
+    C --> E[MongoDB<br/>raw JSON events]
+
+    D --> F[SQL tables + views]
+    E --> G[original Docker event]
+
+    F --> H[Next.js]
+    G --> H
+
+    H --> I[Dashboard]
 ```
 ### Relational schema
 
