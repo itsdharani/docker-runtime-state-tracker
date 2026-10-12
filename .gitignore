@@ -1,0 +1,6 @@
+.env
+.venv/
+.runtime_tracker_backups/
+__pycache__/
+dashboard/AGENTS.md
+dashboard/CLAUDE.md

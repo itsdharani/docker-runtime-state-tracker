@@ -41,11 +41,13 @@ export default function Home() {
   }
 
   useEffect(() => {
-    loadContainers();
-
+    const initialLoad = setTimeout(loadContainers, 0);
     const interval = setInterval(loadContainers, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
   }, []);
 
   const running = containers.filter(
@@ -70,6 +72,10 @@ export default function Home() {
       <div className="mx-auto max-w-7xl">
 
         <div className="mb-8">
+          <nav className="mb-4 flex gap-3 text-sm font-medium">
+            <a className="rounded-lg bg-white px-4 py-2 shadow" href="/events">Event history</a>
+            <a className="rounded-lg bg-white px-4 py-2 shadow" href="/dependencies">Dependencies</a>
+          </nav>
           <h1 className="text-3xl font-bold">
             Docker Runtime Tracker
           </h1>

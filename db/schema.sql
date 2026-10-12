@@ -105,7 +105,7 @@ CREATE TABLE container_status (
 
 -- 6. CONTAINER EVENT HISTORY
 -- Structured information extracted from Docker events.
--- The complete raw event is stored in MongoDB.
+-- Structured information extracted from Docker events.
 
 CREATE TABLE container_event (
     event_id BIGSERIAL PRIMARY KEY,
@@ -115,8 +115,6 @@ CREATE TABLE container_event (
     event_type VARCHAR(50) NOT NULL,
 
     event_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    mongo_ref VARCHAR(255),
 
     CONSTRAINT fk_event_container
         FOREIGN KEY (container_id)

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type Event = {
   container_name: string;
   service_name: string;
   event_type: string;
   event_time: string;
-  mongo_ref: string | null;
 };
 
 export default function EventsPage() {
@@ -38,11 +38,13 @@ export default function EventsPage() {
   }
 
   useEffect(() => {
-    loadEvents();
-
+    const initialLoad = setTimeout(loadEvents, 0);
     const interval = setInterval(loadEvents, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -62,12 +64,10 @@ export default function EventsPage() {
             </p>
           </div>
 
-          <a
-            href="/"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-          >
-            Dashboard
-          </a>
+          <nav className="flex gap-3 text-sm font-medium">
+            <Link href="/" className="rounded-lg bg-gray-900 px-4 py-2 text-white hover:bg-gray-700">Dashboard</Link>
+            <Link href="/dependencies" className="rounded-lg bg-white px-4 py-2 shadow">Dependencies</Link>
+          </nav>
 
         </div>
 
@@ -129,9 +129,6 @@ export default function EventsPage() {
                       Time
                     </th>
 
-                    <th className="px-6 py-4">
-                      Mongo Reference
-                    </th>
 
                   </tr>
 
@@ -175,10 +172,6 @@ export default function EventsPage() {
 
                       <td className="px-6 py-4 text-gray-600">
                         {new Date(event.event_time).toLocaleString()}
-                      </td>
-
-                      <td className="px-6 py-4 text-xs text-gray-500">
-                        {event.mongo_ref || "-"}
                       </td>
 
                     </tr>

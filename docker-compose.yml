@@ -1,11 +1,28 @@
 services:
-  mongo:
-    image: mongo:8
-    container_name: runtime-tracker-mongo
+  postgres:
+    profiles: [compose-postgres]
+    image: postgres:16
+    container_name: runtime-tracker-postgres
+    environment:
+      POSTGRES_DB: ${COMPOSE_PGDATABASE:-runtime_tracker}
+      POSTGRES_USER: ${COMPOSE_PGUSER:-tracker}
+      POSTGRES_PASSWORD: ${COMPOSE_PGPASSWORD:-}
     ports:
-      - "27017:27017"
+      - "${COMPOSE_PG_PORT:-5433}:5432"
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
+
+  neo4j:
+    image: neo4j:5
+    container_name: runtime-tracker-neo4j
+    environment:
+      NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD to the existing Neo4j password}
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
 
 volumes:
-  mongo_data:
+  postgres_data:
+  neo4j_data:

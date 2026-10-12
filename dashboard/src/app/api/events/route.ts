@@ -8,8 +8,7 @@ export async function GET() {
         container_name,
         service_name,
         event_type,
-        event_time,
-        mongo_ref
+        event_time
       FROM container_event_history
       ORDER BY event_time DESC;
     `);

@@ -1,0 +1,4 @@
+docker>=7.0,<8
+psycopg[binary]>=3.2,<4
+neo4j>=5.28,<7
+PyYAML>=6.0,<7

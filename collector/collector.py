@@ -1,31 +1,23 @@
 import docker
 import psycopg
-from pymongo import MongoClient
+import os
 from datetime import datetime
-
+from graph_sync import synchronize_dependency_graph
 
 
 POSTGRES_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "runtime_tracker",
-    "user": "tracker",
-    "password": "tracker",
+    "host": os.getenv("PGHOST", "127.0.0.1"),
+    "port": int(os.getenv("PGPORT", "5432")),
+    "dbname": os.getenv("PGDATABASE", "runtime_tracker"),
+    "user": os.getenv("PGUSER", "tracker"),
+    "password": os.getenv("PGPASSWORD"),
 }
-
-MONGO_URI = "mongodb://localhost:27017"
-MONGO_DATABASE = "runtime_events"
-MONGO_COLLECTION = "events"
 
 
 
 docker_client = docker.from_env()
 
 pg_connection = psycopg.connect(**POSTGRES_CONFIG)
-
-mongo_client = MongoClient(MONGO_URI)
-mongo_database = mongo_client[MONGO_DATABASE]
-mongo_events = mongo_database[MONGO_COLLECTION]
 
 
 
@@ -185,9 +177,7 @@ def get_or_create_container(
 
 def store_event(event):
     """
-    Store one Docker event in:
-        1. MongoDB - complete raw JSON
-        2. PostgreSQL - structured information
+    Store the structured event information in PostgreSQL.
     """
 
     event_type = event.get("Type")
@@ -216,26 +206,7 @@ def store_event(event):
 
     # Docker timestamp
 
-    event_timestamp = datetime.fromtimestamp(
-        event["time"]
-    )
-
-    # MONGODB
-
-    mongo_document = {
-        "docker_event": event,
-        "received_at": datetime.now(),
-    }
-
-    mongo_result = mongo_events.insert_one(
-        mongo_document
-    )
-
-    mongo_ref = str(
-        mongo_result.inserted_id
-    )
-
-    # POSTGRESQL
+    event_timestamp = datetime.fromtimestamp(event["time"])
 
     with pg_connection.cursor() as cursor:
 
@@ -266,16 +237,14 @@ def store_event(event):
             INSERT INTO container_event (
                 container_id,
                 event_type,
-                event_time,
-                mongo_ref
+                event_time
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s)
             """,
             (
                 container_id,
                 action,
                 event_timestamp,
-                mongo_ref,
             ),
         )
 
@@ -441,11 +410,17 @@ def main():
     print(" Docker Runtime Tracker")
     print("Connected to Docker")
     print("Connected to PostgreSQL")
-    print("Connected to MongoDB")
-
     synchronize_existing_containers()
-
-    listen_for_events()
+    try:
+        synchronize_dependency_graph()
+        print("Synchronized declared Compose dependencies to Neo4j")
+    except Exception as error:
+        print("WARNING: Neo4j dependency synchronization failed:", error)
+    try:
+        listen_for_events()
+    finally:
+        pg_connection.close()
+        docker_client.close()
 
 
 if __name__ == "__main__":

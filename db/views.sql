@@ -42,8 +42,7 @@ SELECT
     c.name AS container_name,
     s.name AS service_name,
     e.event_type,
-    e.event_time,
-    e.mongo_ref
+    e.event_time
 FROM container_event e
 JOIN container c
     ON e.container_id = c.container_id
