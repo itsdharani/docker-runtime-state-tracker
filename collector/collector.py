@@ -5,6 +5,7 @@ from datetime import datetime
 from graph_sync import synchronize_dependency_graph
 from runtime_graph import RuntimeGraph, event_state
 from neo4j import GraphDatabase
+from neo4j_config import create_neo4j_driver
 from datetime import timezone
 
 
@@ -30,10 +31,7 @@ def connect_runtime_graph():
     if runtime_graph:
         return runtime_graph
     try:
-        neo4j_driver = GraphDatabase.driver(
-            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "")),
-        )
+        neo4j_driver = create_neo4j_driver(GraphDatabase.driver)
         neo4j_driver.verify_connectivity()
         runtime_graph = RuntimeGraph(neo4j_driver, os.getenv("GRAPH_PROJECT_NAME", "runtime-tracker"))
         runtime_graph.ensure_schema()

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 from neo4j import GraphDatabase
+from neo4j_config import create_neo4j_driver
 
 
 def _dependency_map(compose_path):
@@ -47,10 +48,7 @@ def synchronize_dependency_graph():
     if unknown:
         raise ValueError(f"depends_on references an undeclared service: {unknown[0]['required']}")
 
-    driver = GraphDatabase.driver(
-        os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-        auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "")),
-    )
+    driver = create_neo4j_driver(GraphDatabase.driver)
     try:
         driver.verify_connectivity()
         with driver.session() as session:

@@ -31,6 +31,17 @@ set -a
 set +a
 ```
 
+In Fish, process environment variables take precedence. The collector and graph sync also read missing Neo4j settings from the configured env file directly, so exporting them is optional when that file is present. To use Fish variables instead:
+
+```fish
+set -gx NEO4J_URI "$NEO4J_URI"
+set -gx NEO4J_USERNAME "$NEO4J_USERNAME"
+set -gx NEO4J_PASSWORD "$NEO4J_PASSWORD"
+python collector/collector.py
+```
+
+If a required value is missing from both sources, the collector and graph sync report the missing setting name rather than attempting authentication with an empty-password fallback.
+
 The file points PostgreSQL at the existing native database and uses its current host authentication, so it does not contain a PostgreSQL password. For other machines, start from `.env.example`; omit `PGPASSWORD` when host authentication does not require it. Keep credentials private and do not overwrite an existing `.env`.
 
 | Variable | Purpose |
