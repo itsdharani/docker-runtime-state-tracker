@@ -145,6 +145,9 @@ export default function Home() {
             <p className="mt-1 text-sm text-gray-500">
               Automatically refreshed every 5 seconds
             </p>
+            <p className="mt-1 text-sm text-gray-500">
+              Dependency relationships are declared for Compose services. Standalone containers have unknown dependencies.
+            </p>
           </div>
 
           {loading ? (

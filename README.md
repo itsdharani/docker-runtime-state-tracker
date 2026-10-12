@@ -15,7 +15,7 @@ flowchart LR
 ## Why two databases?
 
 - **PostgreSQL** is the primary relational store for services, containers, current status, and event history. Existing views and the event trigger continue to provide status updates and dashboard queries.
-- **Neo4j** stores declared service-to-service dependencies as directed `(:Service)-[:DEPENDS_ON]->(:Service)` relationships, including the Compose dependency condition. It supports graph traversal and downstream impact queries.
+- **Neo4j** stores declared service-to-service dependencies as directed `(:Service)-[:DEPENDS_ON]->(:Service)` relationships, including the Compose dependency condition. Runtime containers are separate `:Container` nodes keyed by full Docker ID, and Compose instances link to their logical service using `:INSTANCE_OF`.
 
 Runtime health remains in PostgreSQL. A declared dependency is not evidence that either service is healthy, and downstream impact is a potential relationship-based impact, not a guarantee that an outage propagates.
 
@@ -72,13 +72,15 @@ pip install -r collector/requirements.txt
 python collector/collector.py
 ```
 
-At startup, the collector synchronizes existing containers into PostgreSQL, then synchronizes the configured Compose dependency graph to Neo4j. It then listens to Docker events and inserts structured lifecycle records into PostgreSQL. Neo4j synchronization can also be run on demand:
+At startup, the collector synchronizes the configured Compose dependency graph, discovers all existing containers (including stopped containers), and reconciles PostgreSQL and Neo4j runtime state. It then listens to the existing Docker event stream and records lifecycle events in PostgreSQL while updating the corresponding Neo4j container node. Removed containers remain in Neo4j with `status: "removed"`; PostgreSQL retains the destroy event and uses its supported `stopped` status. Neo4j synchronization can also be run on demand:
 
 ```sh
 python collector/graph_sync.py
 ```
 
 Synchronization is idempotent. Service node IDs combine the Compose project namespace and service key. Every run updates nodes and relationships, stores `depends_on` conditions (`service_started` for short syntax), removes stale dependency edges, and removes nodes for services removed from that project's source file. It does not derive dependencies from container names or event order. Graph sync runs at collector startup or when invoked directly; rerun it after editing Compose configuration.
+
+The collector creates `(:Container {container_id})` nodes using the full Docker ID. Container metadata includes name, image, current runtime `status`, `discovered_at`, `updated_at`, and Compose labels when available. Compose containers link to the namespaced `:Service` node with `:INSTANCE_OF`; replica instances remain independent. Standalone containers have no `INSTANCE_OF` link and no inferred dependencies. Container stop/removal never deletes a logical service or its `DEPENDS_ON` relationships.
 
 ## Run the dashboard
 
@@ -91,6 +93,8 @@ npm run dev
 ```
 
 Open <http://localhost:3000>. The overview shows current containers, `/events` shows PostgreSQL event history, and `/dependencies` shows the declared graph from Neo4j. The graph API is `/api/dependencies`; query examples are available at `/api/dependencies/query?service=api&kind=direct` (supported kinds: `direct`, `dependents`, `transitive`, `impact`).
+
+The dashboard container list is backed by PostgreSQL's current status view. The dependency page remains the declared Compose graph; standalone containers have unknown dependencies unless they are explicitly represented in Compose.
 
 ## Queries
 
@@ -129,6 +133,36 @@ MATCH p=(s:Service {service_id: $service_id})<-[:DEPENDS_ON*1..]-(d:Service)
 WHERE d <> s RETURN d.name, min(length(p)) AS dependency_distance
 ORDER BY dependency_distance, d.name;
 ```
+
+Inspect discovered container instances and their Compose service associations:
+
+```cypher
+MATCH (c:Container)
+OPTIONAL MATCH (c)-[:INSTANCE_OF]->(s:Service)
+RETURN c.container_id AS id, c.name AS name, c.image AS image,
+       c.status AS status, s.name AS compose_service,
+       c.discovered_at AS discovered_at, c.updated_at AS updated_at
+ORDER BY name, id;
+```
+
+Show stopped, dead, and removed containers:
+
+```cypher
+MATCH (c:Container)
+WHERE c.status IN ['stopped', 'dead', 'removed']
+RETURN c.container_id, c.name, c.status, c.updated_at
+ORDER BY c.updated_at DESC;
+```
+
+For a safe live discovery check, start the collector, then create and remove a uniquely named temporary container:
+
+```sh
+docker run -d --name tracker-auto-discovery-check busybox sleep 600
+docker stop tracker-auto-discovery-check
+docker rm tracker-auto-discovery-check
+```
+
+Check `tracker-auto-discovery-check` in the dashboard or with the Cypher above. The row remains with `status: "removed"` after `docker rm`.
 
 An unknown service or a service with no matching dependencies returns an empty result. Queries use declared relationships; combine them with PostgreSQL runtime status to assess current health.
 

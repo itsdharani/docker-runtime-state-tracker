@@ -3,6 +3,9 @@ import psycopg
 import os
 from datetime import datetime
 from graph_sync import synchronize_dependency_graph
+from runtime_graph import RuntimeGraph, event_state
+from neo4j import GraphDatabase
+from datetime import timezone
 
 
 POSTGRES_CONFIG = {
@@ -18,6 +21,37 @@ POSTGRES_CONFIG = {
 docker_client = docker.from_env()
 
 pg_connection = psycopg.connect(**POSTGRES_CONFIG)
+neo4j_driver = None
+runtime_graph = None
+
+
+def connect_runtime_graph():
+    global neo4j_driver, runtime_graph
+    if runtime_graph:
+        return runtime_graph
+    try:
+        neo4j_driver = GraphDatabase.driver(
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "")),
+        )
+        neo4j_driver.verify_connectivity()
+        runtime_graph = RuntimeGraph(neo4j_driver, os.getenv("GRAPH_PROJECT_NAME", "runtime-tracker"))
+        runtime_graph.ensure_schema()
+        return runtime_graph
+    except Exception:
+        if neo4j_driver:
+            neo4j_driver.close()
+        neo4j_driver = None
+        runtime_graph = None
+        raise
+
+
+def forget_runtime_graph():
+    global neo4j_driver, runtime_graph
+    runtime_graph = None
+    if neo4j_driver:
+        neo4j_driver.close()
+        neo4j_driver = None
 
 
 
@@ -204,9 +238,11 @@ def store_event(event):
         "unknown",
     )
 
-    # Docker timestamp
-
-    event_timestamp = datetime.fromtimestamp(event["time"])
+    event_epoch = event.get("timeNano", event.get("time"))
+    if "timeNano" in event:
+        event_epoch = event_epoch / 1_000_000_000
+    event_timestamp = datetime.fromtimestamp(event_epoch, tz=timezone.utc)
+    state = event_state(action)
 
     with pg_connection.cursor() as cursor:
 
@@ -244,11 +280,26 @@ def store_event(event):
             (
                 container_id,
                 action,
-                event_timestamp,
+                event_timestamp.replace(tzinfo=None),
             ),
         )
 
+        if state == "removed":
+            cursor.execute(
+                "UPDATE container_status SET current_state = 'stopped', last_event_type = %s, last_updated = %s WHERE container_id = %s",
+                (action, event_timestamp.replace(tzinfo=None), container_id),
+            )
+
     pg_connection.commit()
+    try:
+        connect_runtime_graph().upsert_container(
+            container_id=container_id, name=container_name, image=image,
+            status=state if state != "unknown" else None,
+            labels=labels, updated_at=event_timestamp.isoformat(),
+        )
+    except Exception as error:
+        forget_runtime_graph()
+        print("WARNING: Neo4j runtime update failed; event remains in PostgreSQL and will be reconciled:", error)
 
 
 # INITIAL SYNCHRONIZATION
@@ -267,6 +318,7 @@ def synchronize_existing_containers():
     containers = docker_client.containers.list(
         all=True
     )
+    active_container_ids = [container.id for container in containers]
 
     for container in containers:
 
@@ -332,13 +384,25 @@ def synchronize_existing_containers():
             )
 
         pg_connection.commit()
+        if runtime_graph:
+            runtime_graph.upsert_container(
+                container_id=container_id, name=container_name, image=image,
+                status=current_state, labels=labels,
+            )
 
-        print(
-            f"SYNC: {container_name} | "
-            f"{current_state}"
+        print(f"SYNC: {container_name} | {current_state}")
+
+    with pg_connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE container_status SET current_state = 'stopped', last_updated = CURRENT_TIMESTAMP "
+            "WHERE current_state IN ('running', 'restarting', 'paused', 'created') "
+            "AND NOT (container_id = ANY(%s))",
+            (active_container_ids,),
         )
-
+    pg_connection.commit()
     print("Initial synchronization complete.")
+    if runtime_graph:
+        runtime_graph.mark_missing_removed(active_container_ids)
 
 
 # EVENT LISTENER
@@ -410,17 +474,24 @@ def main():
     print(" Docker Runtime Tracker")
     print("Connected to Docker")
     print("Connected to PostgreSQL")
-    synchronize_existing_containers()
+    try:
+        connect_runtime_graph()
+    except Exception as error:
+        forget_runtime_graph()
+        print("WARNING: Neo4j runtime tracking unavailable:", error)
     try:
         synchronize_dependency_graph()
         print("Synchronized declared Compose dependencies to Neo4j")
     except Exception as error:
         print("WARNING: Neo4j dependency synchronization failed:", error)
+    synchronize_existing_containers()
     try:
         listen_for_events()
     finally:
         pg_connection.close()
         docker_client.close()
+        if neo4j_driver:
+            neo4j_driver.close()
 
 
 if __name__ == "__main__":
