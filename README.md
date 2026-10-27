@@ -4,12 +4,24 @@ The collector records Docker container lifecycle events and current state in Pos
 
 ```mermaid
 flowchart LR
-  Docker -->|events and container metadata| Collector[Python collector]
-  Collector -->|runtime records| PostgreSQL
-  Compose[Docker Compose configuration] -->|depends_on| Sync[Dependency sync]
-  Sync --> Neo4j
-  PostgreSQL -->|server-side API| Next[Next.js dashboard]
-  Neo4j -->|server-side API| Next
+  subgraph Inputs
+    Docker[Docker containers]
+    Compose[Docker Compose file]
+  end
+
+  Collector[Python collector]
+  PostgreSQL[(PostgreSQL<br/>runtime state and events)]
+  Neo4j[(Neo4j<br/>declared dependencies)]
+  Next[Next.js dashboard]
+  Browser[Web browser]
+
+  Docker -->|lifecycle events<br/>container metadata| Collector
+  Collector -->|container state<br/>event history| PostgreSQL
+  Compose -->|service dependencies| Collector
+  Collector -->|services and relationships| Neo4j
+  PostgreSQL -->|server-side queries| Next
+  Neo4j -->|server-side queries| Next
+  Next -->|pages and API responses| Browser
 ```
 
 ## Why two databases?
