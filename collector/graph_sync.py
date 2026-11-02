@@ -13,6 +13,10 @@ def synchronize_dependency_graph(client=None, registered_sources=None):
         driver.verify_connectivity()
         with driver.session() as session:
             session.run("CREATE CONSTRAINT service_id_unique IF NOT EXISTS FOR (s:Service) REQUIRE s.service_id IS UNIQUE").consume()
+            session.run(
+                "MATCH (s:Service) WHERE s.discovered IS NULL "
+                "SET s.discovered=false"
+            ).consume()
             for project, paths in sources.items():
                 try:
                     services, edges = read_project(project, paths)

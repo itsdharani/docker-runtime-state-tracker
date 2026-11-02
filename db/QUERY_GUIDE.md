@@ -21,7 +21,7 @@ The service schema stores the Compose project label and configuration path; sect
 
 ### Captured PostgreSQL result sample
 
-The SQL collection was executed on 2026-11-02 against the configured `runtime_tracker` database. After the Docker lifecycle smoke test, the state aggregation returned: `created=1`, `removed=7`, `stopped=21`. The event aggregation returned: `create=13`, `destroy=6`, `die=13`, `exec_create: mongosh=1`, `exec_die=1`, `exec_start: mongosh=1`, `kill=19`, `restart=2`, `start=17`, `stop=12`. These are captured environment results, not expected constants; values change as Docker events arrive. The complete SQL file also ran with its DML/DDL demonstrations and rolled them back successfully.
+The SQL collection was executed on 2026-11-02 against the configured `runtime_tracker` database. After Docker lifecycle smoke tests, the state aggregation returned: `created=1`, `removed=9`, `running=1`, `stopped=20`. The event aggregation returned: `create=14`, `destroy=7`, `die=14`, `exec_create: mongosh=1`, `exec_die=1`, `exec_start: mongosh=1`, `kill=21`, `restart=2`, `start=18`, `stop=13`. These are captured environment results, not expected constants; values change as Docker events arrive. The complete SQL file also ran with its DML/DDL demonstrations and rolled them back successfully.
 
 ## Neo4j guide
 

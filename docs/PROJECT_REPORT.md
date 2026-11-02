@@ -85,7 +85,7 @@ graph LR
 
 `Service.service_id` uses `<compose project>:<service key>` and `Container.container_id` uses the full Docker ID. `DEPENDS_ON` points from the dependent to the service it requires. `INSTANCE_OF` joins actual replicas to one logical service. Standalone containers have no invented service/dependency edge. Removed containers remain with `status: removed`; services removed from a readable Compose file are marked `discovered: false` so historical instance edges remain inspectable.
 
-Open `db/demo_queries.cypher` in Neo4j Browser to inspect nodes, relationships, direct and transitive traversal, independent services, path distances, shortest paths, constraints, and safe targeted graph maintenance. Live Cypher output was not captured in this environment because Neo4j was unreachable during verification.
+Open `db/demo_queries.cypher` in Neo4j Browser to inspect nodes, relationships, direct and transitive traversal, independent services, path distances, shortest paths, constraints, and safe targeted graph maintenance. Live Cypher was verified against the running Neo4j database: `demo:frontend` returned direct dependency `api` and transitive dependencies `api`, `postgres`, and `redis`; selecting `demo:postgres` returned potential impact `api` at distance 1 and `frontend` at distance 2. A repeated sync held at 14 service nodes, 6 dependency edges, and 26 container nodes; 10 services were actively discovered. One labeled `sdn_mininet` project path was inaccessible and was reported as unavailable.
 
 ## Application and API
 
@@ -109,9 +109,10 @@ SQL and Cypher route values are parameterized. Event sort direction is selected 
 - PostgreSQL demo query collection: executed against the configured database; the DML and temporary DDL sections rolled back.
 - PostgreSQL destroy/OOM trigger behavior: checked with transaction-scoped event inserts and rolled back.
 - Live Docker lifecycle smoke test ran with a uniquely named BusyBox container. PostgreSQL recorded `create`, `start`, `kill`, `stop`, `die`, and `destroy`; state moved from `running` to `stopped` and then `removed`, with all seven event rows preserved. The first run exposed the `die → dead` mapping issue; it was corrected to `die → stopped` while `kill` and `oom` remain `dead`, then the test passed.
-- Neo4j synchronization and browser queries were not live-tested because Neo4j was unavailable.
+- With Neo4j online, a standalone BusyBox container appeared as a running `Container` node with zero `INSTANCE_OF` edges; after stop/removal, the graph retained it with `status: removed`, while PostgreSQL retained all seven lifecycle events.
+- Authenticated live API smoke test returned HTTP 200 for Overview, Dependency Graph, Containers, Event History, and Impact Analysis. The real dependency API returned 10 active services; impact returned `api:1` and `frontend:2` for `demo:postgres`.
 
-Capture current dashboard and Neo4j Browser screenshots during the live demonstration and add them here. No screenshots or graph query output are fabricated.
+Capture current dashboard and Neo4j Browser screenshots during the live demonstration and add them here. Query output above was captured from the running Neo4j database; no screenshots are fabricated.
 
 ## Conclusion and future work
 
