@@ -18,7 +18,7 @@ export async function proxy(request: NextRequest) {
   if (path === "/login" || path.startsWith("/api/auth/")) return NextResponse.next();
   const user = await validSession(request.cookies.get("runtime_session")?.value);
   if (!user) return path.startsWith("/api/") ? NextResponse.json({ error: "Authentication required" }, { status: 401 }) : NextResponse.redirect(new URL("/login", request.url));
-  if (path.startsWith("/users") && user.role !== "ADMIN") return NextResponse.redirect(new URL("/", request.url));
+  if ((path.startsWith("/users") || path.startsWith("/settings")) && user.role !== "ADMIN") return NextResponse.redirect(new URL("/", request.url));
   if (path.startsWith("/api/admin/") && user.role !== "ADMIN") return NextResponse.json({ error: "Administrator role required" }, { status: 403 });
   return NextResponse.next();
 }

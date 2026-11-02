@@ -86,6 +86,8 @@ psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -f db/indexes.sql
 
 For an existing database, back it up before applying `db/migrations/001_remove_mongo_ref.sql` once to `runtime_tracker`. It drops only the Mongo-specific reference column and rebuilds the event history view; it preserves event rows and all other data. Never initialize the schema on an existing populated database.
 
+Apply `db/migrations/002_project_identity_and_history.sql` and `db/migrations/003_compose_source_registry.sql` to an existing project database after backing it up. They add project-scoped service identity, preserve rows while changing service deletion to RESTRICT, retain event history, refresh the runtime view, and create the admin-managed Compose source registry. The migrations are transactional and safe to rerun. Apply `db/triggers.sql` afterward to install the `destroy/oom → removed/dead` status transitions. A fresh database receives these definitions directly from `db/schema.sql`, `db/views.sql`, and `db/triggers.sql`.
+
 ## Run the collector
 
 The collector requires access to the Docker daemon, PostgreSQL, and Neo4j. Install dependencies and start it from the repository root:
@@ -97,13 +99,13 @@ pip install -r collector/requirements.txt
 python collector/collector.py
 ```
 
-At startup, the collector synchronizes the configured Compose dependency graph, discovers all existing containers (including stopped containers), and reconciles PostgreSQL and Neo4j runtime state. It then listens to the existing Docker event stream and records lifecycle events in PostgreSQL while updating the corresponding Neo4j container node. Removed containers remain in Neo4j with `status: "removed"`; PostgreSQL retains the destroy event and uses its supported `stopped` status. Neo4j synchronization can also be run on demand:
+At startup, the collector synchronizes Compose dependencies, discovers existing containers (including stopped containers), and reconciles PostgreSQL and Neo4j runtime state. It then records Docker lifecycle events in PostgreSQL and updates the corresponding Neo4j container node. Removed containers remain in both databases with `removed` status, and lifecycle history is protected from container/service deletion. Neo4j synchronization can also be run on demand:
 
 ```sh
 python collector/graph_sync.py
 ```
 
-Synchronization is idempotent. It discovers Compose project/config paths from Docker labels and also accepts registered paths through `COMPOSE_PATHS` (or the single `COMPOSE_FILE` fallback). Service node IDs combine the Compose project namespace and service key. Every run updates nodes and relationships, stores `depends_on` conditions (`service_started` for short syntax), removes stale dependency edges, and removes nodes for services removed from an accessible project's source file. An inaccessible file is reported and its prior graph is preserved. It does not derive dependencies from container names or event order. Graph sync runs at collector startup or when invoked directly; rerun it after editing Compose configuration.
+Synchronization is idempotent. It discovers Compose project/config paths from Docker labels and also accepts registered paths through `COMPOSE_PATHS` (or the single `COMPOSE_FILE` fallback). Multiple config files for a project are merged in label order. Service node IDs combine the Compose project namespace and service key. Every run updates nodes and relationships, stores `depends_on` conditions (`service_started` for short syntax), removes stale edges, and marks removed services undiscovered while preserving their historical container associations. An inaccessible file is reported in the collector and service detail panel; its previous graph is preserved and marked unavailable. It does not derive dependencies from container names or event order. Graph sync runs at collector startup or when invoked directly; rerun it after editing Compose configuration.
 
 The collector creates `(:Container {container_id})` nodes using the full Docker ID. Container metadata includes name, image, current runtime `status`, `discovered_at`, `updated_at`, and Compose labels when available. Compose containers link to the namespaced `:Service` node with `:INSTANCE_OF`; replica instances remain independent. Standalone containers have no `INSTANCE_OF` link and no inferred dependencies. Container stop/removal never deletes a logical service or its `DEPENDS_ON` relationships.
 
@@ -117,7 +119,7 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. The overview shows current containers, `/events` shows PostgreSQL event history, and `/dependencies` shows the declared graph from Neo4j. The graph API is `/api/dependencies`; query examples are available at `/api/dependencies/query?service=api&kind=direct` (supported kinds: `direct`, `dependents`, `transitive`, `impact`).
+Open <http://localhost:3000> and sign in. The dashboard provides Overview, Dependency Graph, Containers, Event History, and Impact Analysis. Graph data and traversal queries use Neo4j through server routes. For a live traversal, use `/api/dependencies/query?id=<project>:<service>&kind=direct` (supported kinds: `direct`, `dependents`, `transitive`, `impact`).
 
 Create the first administrator once using the dashboard environment and PostgreSQL connection:
 
@@ -127,7 +129,7 @@ node scripts/create-user.mjs admin ADMIN
 npm run dev
 ```
 
-The command prompts for a password and stores a scrypt hash. Sign in at `/login`; user administration is available to admins at `/users`. All dashboard APIs require the signed `runtime_session` cookie, and admin APIs check the role in middleware. Set `AUTH_SECRET` to a private random value of at least 32 characters.
+The command prompts for a password and stores a scrypt hash. Sign in at `/login`; user administration is available to admins at `/users`, including role changes and account removal. Discovery settings at `/settings` let admins register absolute Compose file paths in PostgreSQL; the collector syncs these at startup. All dashboard APIs require the signed `runtime_session` cookie, and admin APIs verify the current database role. Set `AUTH_SECRET` to a private random value of at least 32 characters.
 
 The dashboard container list is backed by PostgreSQL's current status view. The dependency page remains the declared Compose graph; standalone containers have unknown dependencies unless they are explicitly represented in Compose.
 
@@ -226,7 +228,7 @@ The existing service/container/status/event/network schema, service dependency t
 
 ## Limitations
 
-- Docker labels identify each discovered Compose project and its configuration file. Register additional files with `COMPOSE_PATHS`; the collector reads individual YAML files and does not invoke Docker Compose to merge override files.
+- Docker labels identify discovered Compose project files. Additional files can be registered with `COMPOSE_PATHS`; dependency declarations are merged by service name, but advanced Compose merge tags/interpolation are not evaluated by the collector.
 - The sample Compose topology is illustrative and separate from the root database infrastructure Compose file.
-- The graph page is a hierarchical list, not a force-directed graph. It clearly shows the dependent-to-required arrow and Compose condition.
+- The dependency page uses a filterable service graph view with project, relationship, status, and detail information. It does not use a force-directed layout.
 - Event history retains structured Docker event fields in PostgreSQL, not the complete raw event payload.

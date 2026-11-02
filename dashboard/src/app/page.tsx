@@ -18,7 +18,7 @@ export default function Home() {
     const params = new URLSearchParams({q:query,page:"1"});
     fetch(`/api/containers?${params}`, {cache:"no-store"}).then(async r => { if (!r.ok) throw new Error(); setData(await r.json()); }).catch(() => setError("Could not load container rows."));
   }, [query]);
-  const cards = [["Containers",overview?.total],["Running",overview?.running],["Stopped / removed",overview?.stopped],["Services",overview?.services],["Compose projects",overview?.projects],["Errors / unknown",overview?.errors]];
+  const cards = [["Containers",overview?.total],["Running",overview?.running],["Stopped / removed",overview?.stopped],["Services",overview?.services],["Compose projects",overview?.projects],["Dead / unknown",overview?.errors]];
   return <main className="min-h-screen bg-slate-100 p-6 text-slate-900 md:p-10"><h1 className="text-3xl font-bold">Overview</h1><p className="mt-2 text-slate-600">Current Docker runtime state and recent lifecycle activity.</p>
     {error && <p role="alert" className="mt-4 rounded bg-red-100 p-3 text-red-800">{error}</p>}
     <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{cards.map(([label,value]) => <article key={label} className="rounded-xl bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-semibold">{value ?? "—"}</p></article>)}</section>

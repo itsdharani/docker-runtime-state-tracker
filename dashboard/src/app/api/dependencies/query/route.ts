@@ -4,14 +4,16 @@ import { getNeo4jDriver } from "@/lib/neo4j";
 
 const queryByKind: Record<string, string> = {
   direct: `MATCH (s:Service {service_id: $id})-[:DEPENDS_ON]->(d:Service)
+           WHERE coalesce(d.discovered, true)
            RETURN d.service_id AS id, d.name AS service, null AS distance ORDER BY service`,
   dependents: `MATCH (s:Service {service_id: $id})<-[:DEPENDS_ON]-(d:Service)
+               WHERE coalesce(d.discovered, true)
                RETURN d.service_id AS id, d.name AS service, null AS distance ORDER BY service`,
   transitive: `MATCH (s:Service {service_id: $id})-[:DEPENDS_ON*1..]->(d:Service)
-               WHERE d <> s
+               WHERE d <> s AND coalesce(d.discovered, true)
                RETURN DISTINCT d.service_id AS id, d.name AS service, null AS distance ORDER BY service`,
   impact: `MATCH p=(s:Service {service_id: $id})<-[:DEPENDS_ON*1..]-(d:Service)
-           WHERE d <> s
+           WHERE d <> s AND coalesce(d.discovered, true)
            RETURN d.service_id AS id, d.name AS service, min(length(p)) AS distance ORDER BY distance, service`,
 };
 

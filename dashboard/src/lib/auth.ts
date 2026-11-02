@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import pool from "@/lib/db";
 
 export type User = { username: string; role: "ADMIN" | "VIEWER"; expires: number };
 const cookieName = "runtime_session";
@@ -22,4 +23,10 @@ export function verifyPassword(password: string, encoded: string) {
   return expected.length === actual.length && timingSafeEqual(actual, expected);
 }
 export async function currentUser() { return readSession((await cookies()).get(cookieName)?.value); }
+export async function currentAdmin() {
+  const user = await currentUser();
+  if (!user || user.role !== "ADMIN") return null;
+  const result = await pool.query("SELECT role FROM app_user WHERE username=$1", [user.username]);
+  return result.rows[0]?.role === "ADMIN" ? user : null;
+}
 export const sessionCookie = { name: cookieName, options: { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 3 * 86400 } };

@@ -92,20 +92,26 @@ FROM information_schema.triggers WHERE event_object_table = 'container_event';
 
 -- 18. Safe INSERT container/status/event + UPDATE + DELETE example. Rolls back all.
 BEGIN;
-WITH new_service AS (
-  INSERT INTO service (name, image) VALUES ('__query_demo__', 'busybox')
-  RETURNING service_id
-), new_container AS (
-  INSERT INTO container (container_id, service_id, name, image)
-  SELECT md5(clock_timestamp()::text), service_id, '__query_demo__', 'busybox'
-  FROM new_service RETURNING container_id
-)
+SELECT 'query-demo-' || txid_current() AS demo_project \gset
+INSERT INTO service (name, compose_project, image)
+VALUES ('__query_demo__', :'demo_project', 'busybox');
+INSERT INTO container (container_id, service_id, name, image)
+SELECT md5(clock_timestamp()::text), service_id, '__query_demo__', 'busybox'
+FROM service WHERE compose_project = :'demo_project';
 INSERT INTO container_status (container_id, current_state)
-SELECT container_id, 'created' FROM new_container;
+SELECT container_id, 'created' FROM container WHERE name = '__query_demo__'
+AND service_id = (SELECT service_id FROM service WHERE compose_project = :'demo_project');
 INSERT INTO container_event (container_id, event_type)
-SELECT container_id, 'create' FROM container WHERE name = '__query_demo__';
-UPDATE container SET image = 'busybox:latest' WHERE name = '__query_demo__';
-DELETE FROM service WHERE name = '__query_demo__';
+SELECT container_id, 'create' FROM container WHERE name = '__query_demo__'
+AND service_id = (SELECT service_id FROM service WHERE compose_project = :'demo_project');
+UPDATE container SET image = 'busybox:latest' WHERE name = '__query_demo__'
+AND service_id = (SELECT service_id FROM service WHERE compose_project = :'demo_project');
+DELETE FROM container_event WHERE container_id IN (SELECT container_id FROM container
+WHERE service_id = (SELECT service_id FROM service WHERE compose_project = :'demo_project'));
+DELETE FROM container_status WHERE container_id IN (SELECT container_id FROM container
+WHERE service_id = (SELECT service_id FROM service WHERE compose_project = :'demo_project'));
+DELETE FROM container WHERE service_id = (SELECT service_id FROM service WHERE compose_project = :'demo_project');
+DELETE FROM service WHERE compose_project = :'demo_project';
 ROLLBACK;
 
 -- 19. Safe CREATE/ALTER/DROP demonstration, isolated in a temporary table.

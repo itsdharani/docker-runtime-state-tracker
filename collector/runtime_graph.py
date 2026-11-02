@@ -1,27 +1,15 @@
 """Idempotent Neo4j synchronization for Docker container instances."""
-
-
-def event_state(action):
-    return {
-        "create": "created", "start": "running", "restart": "running",
-        "stop": "stopped", "die": "dead", "kill": "dead",
-        "pause": "paused", "unpause": "running", "destroy": "removed",
-        "oom": "dead",
-    }.get(action, "unknown")
-
-
+from event_state import event_state
 class RuntimeGraph:
     def __init__(self, driver, graph_project="runtime-tracker"):
         self.driver = driver
         self.graph_project = graph_project
-
     def ensure_schema(self):
         with self.driver.session() as session:
             session.run(
                 "CREATE CONSTRAINT container_id_unique IF NOT EXISTS "
                 "FOR (c:Container) REQUIRE c.container_id IS UNIQUE"
             ).consume()
-
     def mark_missing_removed(self, active_container_ids):
         with self.driver.session() as session:
             session.run(
@@ -30,7 +18,6 @@ class RuntimeGraph:
                 "SET c.status = 'removed', c.updated_at = datetime()",
                 active_ids=active_container_ids,
             ).consume()
-
     def upsert_container(self, *, container_id, name, image, status,
                          labels=None, updated_at=None):
         labels = labels or {}

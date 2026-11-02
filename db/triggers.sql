@@ -65,7 +65,7 @@ BEGIN
 
     -- Container killed
 
-    ELSIF NEW.event_type = 'kill' THEN
+    ELSIF NEW.event_type = 'kill' OR NEW.event_type = 'oom' THEN
 
         UPDATE container_status
         SET

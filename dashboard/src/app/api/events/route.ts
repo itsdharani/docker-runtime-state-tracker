@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
       WHERE ($1 = '' OR c.name ILIKE '%' || $1 || '%' OR s.name ILIKE '%' || $1 || '%' OR c.container_id ILIKE '%' || $1 || '%')
         AND ($2 = '' OR c.name ILIKE '%' || $2 || '%' OR c.container_id = $2)
         AND ($3 = 'all' OR e.event_type = $3)
-        AND ($5 = '' OR e.event_time >= $5::date)
-        AND ($6 = '' OR e.event_time < ($6::date + interval '1 day'))
+        AND (NULLIF($5, '') IS NULL OR e.event_time >= NULLIF($5, '')::date)
+        AND (NULLIF($6, '') IS NULL OR e.event_time < (NULLIF($6, '')::date + interval '1 day'))
       ORDER BY e.event_time ${sort}, e.event_id ${sort}
       LIMIT 50 OFFSET $4;
     `, [query, container, type, (page - 1) * 50, from, to]);

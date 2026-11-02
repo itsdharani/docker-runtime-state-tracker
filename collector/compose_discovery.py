@@ -1,42 +1,24 @@
-"""Read Compose project sources discovered from Docker labels or settings."""
-import os
+"""Read and merge declared dependencies from Compose YAML files."""
 from pathlib import Path
 
 import yaml
 
 
-def compose_sources(client=None):
-    """Return project/file pairs from running or stopped containers and settings."""
-    if client is None:
-        import docker
-        client = docker.from_env()
-    sources = {}
-    for container in client.containers.list(all=True):
-        labels = container.labels
-        project = labels.get("com.docker.compose.project")
-        files = labels.get("com.docker.compose.project.config_files", "")
-        for filename in files.split(","):
-            if project and filename.strip():
-                sources[(project, filename.strip())] = Path(filename.strip())
-    registered = os.getenv("COMPOSE_PATHS", "")
-    entries = registered.split(os.pathsep) if registered else []
-    if not entries and os.getenv("COMPOSE_FILE"):
-        entries = [f"{os.getenv('GRAPH_PROJECT_NAME', 'runtime-tracker')}={os.getenv('COMPOSE_FILE')}"]
-    for entry in entries:
-        if not entry.strip():
-            continue
-        project_name, separator, filename = entry.partition("=")
-        path = Path(filename if separator else entry).expanduser()
-        project = project_name if separator else (path.parent.name or path.stem)
-        sources[(project, str(path))] = path
-    return sources
+def read_project(project, paths):
+    services = {}
+    paths = paths if isinstance(paths, (list, tuple)) else [paths]
+    for path in paths:
+        with Path(path).resolve().open(encoding="utf-8") as source:
+            config = yaml.safe_load(source) or {}
+        for name, definition in (config.get("services") or {}).items():
+            current = services.setdefault(name, {})
+            declared = definition.get("depends_on")
+            if declared is not None:
+                current["depends_on"] = merge_dependencies(current.get("depends_on"), declared)
+    return services, dependency_edges(project, services)
 
 
-def read_project(project, path):
-    """Read service names and declared dependencies from one Compose file."""
-    with path.resolve().open(encoding="utf-8") as source:
-        config = yaml.safe_load(source) or {}
-    services = config.get("services") or {}
+def dependency_edges(project, services):
     edges = []
     for name, definition in services.items():
         declared = definition.get("depends_on") or {}
@@ -45,4 +27,16 @@ def read_project(project, path):
             if target not in services:
                 raise ValueError(f"{project}:{name} depends on missing service {target}")
             edges.append((name, target, (options or {}).get("condition", "service_started")))
-    return services, edges
+    return edges
+
+
+def merge_dependencies(base, override):
+    merged = _normalize_dependencies(base)
+    merged.update(_normalize_dependencies(override))
+    return merged
+
+
+def _normalize_dependencies(value):
+    if isinstance(value, list):
+        return {name: {} for name in value}
+    return value or {}

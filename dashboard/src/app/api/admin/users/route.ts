@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { currentAdmin, hashPassword } from "@/lib/auth";
 
 export async function GET() {
+  if (!await currentAdmin()) return NextResponse.json({ error: "Administrator role required" }, { status: 403 });
   const result = await pool.query("SELECT user_id, username, role FROM app_user ORDER BY username");
   return NextResponse.json(result.rows);
 }
 
 export async function POST(request: NextRequest) {
+  if (!await currentAdmin()) return NextResponse.json({ error: "Administrator role required" }, { status: 403 });
   try {
     const body = await request.json();
     const username = typeof body.username === "string" ? body.username.trim() : "";

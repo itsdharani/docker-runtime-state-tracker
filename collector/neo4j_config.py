@@ -7,7 +7,6 @@ import shlex
 
 NEO4J_SETTINGS = ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD")
 
-
 def _read_env_file(path):
     settings = {}
     try:
@@ -35,7 +34,6 @@ def _read_env_file(path):
             value = raw_value.split(" #", 1)[0].rstrip()
         settings[key] = value
     return settings
-
 
 def create_neo4j_driver(driver_factory, environ=None, env_file=None):
     """Create a driver from process settings, falling back to the user's config file."""

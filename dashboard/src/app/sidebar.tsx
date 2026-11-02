@@ -9,6 +9,7 @@ const pages = [
   ["Containers", "/containers"], ["Event history", "/events"],
   ["Impact analysis", "/impact"],
   ["User administration", "/users"],
+  ["Discovery settings", "/settings"],
 ];
 
 export function Sidebar() {
