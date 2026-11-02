@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Item = { service: string; service_id: string; distance: number | null };
+type Item = { service: string; service_id: string; distance: number | null; containers:{name:string;status:string}[] };
 type Service = { id: string; name: string; project: string; containers: {name:string;status:string;id:string}[] };
 type Analysis = Record<string, Item[]>;
 
@@ -35,7 +35,7 @@ export default function ImpactPage() {
     {current && <section className="mt-6 rounded-xl bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">{current.project} / {current.name}</h2>
       <p className="mt-2 text-sm text-slate-600">Instances: {current.containers.map(c => `${c.name} (${c.status})`).join(", ") || "none discovered"}</p>
-      <div className="mt-5 grid gap-4 md:grid-cols-2">{Object.entries(names).map(([kind, title]) => <div key={kind} className="rounded-lg border p-4"><h3 className="font-semibold">{title}</h3><ul className="mt-2 space-y-1 text-sm">{(analysis[kind] || []).map(item => <li key={item.service_id}>{item.service}{item.distance ? ` · ${item.distance} hops` : ""}</li>)}</ul>{analysis[kind]?.length === 0 && <p className="mt-2 text-sm text-slate-500">No matching services.</p>}</div>)}</div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">{Object.entries(names).map(([kind, title]) => <div key={kind} className="rounded-lg border p-4"><h3 className="font-semibold">{title}</h3><ul className="mt-2 space-y-2 text-sm">{(analysis[kind] || []).map(item => <li key={item.service_id}><span>{item.service}{item.distance ? ` · ${item.distance} hops` : ""}</span><span className="block text-xs text-slate-500">{item.containers?.map(c=>`${c.name}: ${c.status}`).join(", ")||"No container instances"}</span></li>)}</ul>{analysis[kind]?.length === 0 && <p className="mt-2 text-sm text-slate-500">No matching services.</p>}</div>)}</div>
     </section>}
   </main>;
 }

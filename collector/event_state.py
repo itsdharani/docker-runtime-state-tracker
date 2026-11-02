@@ -4,7 +4,7 @@
 def event_state(action):
     return {
         "create": "created", "start": "running", "restart": "running",
-        "stop": "stopped", "die": "dead", "kill": "dead",
+        "stop": "stopped", "die": "stopped", "kill": "dead",
         "pause": "paused", "unpause": "running", "destroy": "removed",
         "oom": "dead",
     }.get(action, "unknown")

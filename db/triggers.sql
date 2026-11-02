@@ -56,7 +56,7 @@ BEGIN
 
         UPDATE container_status
         SET
-            current_state = 'dead',
+            current_state = 'stopped',
             last_event_type = NEW.event_type,
             last_updated = NEW.event_time
 

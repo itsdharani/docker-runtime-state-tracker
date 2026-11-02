@@ -5,16 +5,26 @@ import { getNeo4jDriver } from "@/lib/neo4j";
 const queryByKind: Record<string, string> = {
   direct: `MATCH (s:Service {service_id: $id})-[:DEPENDS_ON]->(d:Service)
            WHERE coalesce(d.discovered, true)
-           RETURN d.service_id AS id, d.name AS service, null AS distance ORDER BY service`,
+           OPTIONAL MATCH (c:Container)-[:INSTANCE_OF]->(d)
+           RETURN d.service_id AS id, d.name AS service, null AS distance,
+             collect(CASE WHEN c IS NULL THEN null ELSE {name:c.name,status:c.status} END) AS containers ORDER BY service`,
   dependents: `MATCH (s:Service {service_id: $id})<-[:DEPENDS_ON]-(d:Service)
                WHERE coalesce(d.discovered, true)
-               RETURN d.service_id AS id, d.name AS service, null AS distance ORDER BY service`,
+               OPTIONAL MATCH (c:Container)-[:INSTANCE_OF]->(d)
+               RETURN d.service_id AS id, d.name AS service, null AS distance,
+                 collect(CASE WHEN c IS NULL THEN null ELSE {name:c.name,status:c.status} END) AS containers ORDER BY service`,
   transitive: `MATCH (s:Service {service_id: $id})-[:DEPENDS_ON*1..]->(d:Service)
                WHERE d <> s AND coalesce(d.discovered, true)
-               RETURN DISTINCT d.service_id AS id, d.name AS service, null AS distance ORDER BY service`,
+               WITH DISTINCT d
+               OPTIONAL MATCH (c:Container)-[:INSTANCE_OF]->(d)
+               RETURN d.service_id AS id, d.name AS service, null AS distance,
+                 collect(CASE WHEN c IS NULL THEN null ELSE {name:c.name,status:c.status} END) AS containers ORDER BY service`,
   impact: `MATCH p=(s:Service {service_id: $id})<-[:DEPENDS_ON*1..]-(d:Service)
            WHERE d <> s AND coalesce(d.discovered, true)
-           RETURN d.service_id AS id, d.name AS service, min(length(p)) AS distance ORDER BY distance, service`,
+           WITH d, min(length(p)) AS distance
+           OPTIONAL MATCH (c:Container)-[:INSTANCE_OF]->(d)
+           RETURN d.service_id AS id, d.name AS service, distance,
+             collect(CASE WHEN c IS NULL THEN null ELSE {name:c.name,status:c.status} END) AS containers ORDER BY distance, service`,
 };
 
 export async function GET(request: NextRequest) {
@@ -37,6 +47,7 @@ export async function GET(request: NextRequest) {
           service: record.get("service") as string,
           service_id: record.get("id") as string,
           distance: value == null ? null : neo4j.isInt(value) ? value.toNumber() : Number(value),
+          containers: record.get("containers") as Array<{name:string;status:string}>,
         };
       }),
     });

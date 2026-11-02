@@ -105,9 +105,10 @@ SQL and Cypher route values are parameterized. Event sort direction is selected 
 - Python unit tests: 11 passed, covering event-state mapping, Neo4j configuration, Compose independent/dependent services, multiple config-file merging, multiple project label discovery, project-scoped graph IDs, and idempotent `MERGE` query construction.
 - Dashboard `npm run lint`: passed.
 - Dashboard production `npm run build`: passed for all five viewer pages and admin routes.
+- Authentication smoke test: temporary admin and viewer accounts signed in successfully; viewer container read returned HTTP 200, viewer admin settings returned HTTP 403, and admin settings returned HTTP 200. Temporary accounts were deleted afterward.
 - PostgreSQL demo query collection: executed against the configured database; the DML and temporary DDL sections rolled back.
 - PostgreSQL destroy/OOM trigger behavior: checked with transaction-scoped event inserts and rolled back.
-- Live Docker start/stop/remove testing was not repeated in this verification pass. Docker SDK smoke scripts are manual and require the daemon.
+- Live Docker lifecycle smoke test ran with a uniquely named BusyBox container. PostgreSQL recorded `create`, `start`, `kill`, `stop`, `die`, and `destroy`; state moved from `running` to `stopped` and then `removed`, with all seven event rows preserved. The first run exposed the `die → dead` mapping issue; it was corrected to `die → stopped` while `kill` and `oom` remain `dead`, then the test passed.
 - Neo4j synchronization and browser queries were not live-tested because Neo4j was unavailable.
 
 Capture current dashboard and Neo4j Browser screenshots during the live demonstration and add them here. No screenshots or graph query output are fabricated.
