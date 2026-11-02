@@ -2,8 +2,8 @@
 import os
 
 from neo4j import GraphDatabase
-from neo4j_config import create_neo4j_driver
-from runtime_graph import RuntimeGraph
+from collector.config.neo4j_config import create_neo4j_driver
+from collector.graph.runtime_graph import RuntimeGraph
 
 
 class RuntimeService:

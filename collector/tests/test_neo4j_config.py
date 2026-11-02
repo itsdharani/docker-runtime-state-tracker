@@ -1,5 +1,5 @@
 import unittest
-from neo4j_config import create_neo4j_driver
+from collector.config.neo4j_config import create_neo4j_driver
 
 
 class Neo4jConfigTests(unittest.TestCase):

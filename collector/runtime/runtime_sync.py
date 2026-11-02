@@ -1,5 +1,5 @@
 """Reconcile Docker's current containers with PostgreSQL and Neo4j."""
-from container_store import get_or_create_container
+from collector.database.container_store import get_or_create_container
 
 
 def synchronize_existing_containers(client, connection, runtime):

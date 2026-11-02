@@ -1,5 +1,5 @@
 """Idempotent Neo4j synchronization for Docker container instances."""
-from event_state import event_state
+from collector.events.event_state import event_state
 class RuntimeGraph:
     def __init__(self, driver, graph_project="runtime-tracker"):
         self.driver = driver

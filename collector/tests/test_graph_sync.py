@@ -3,8 +3,8 @@ from unittest.mock import patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from graph_sync import read_project
-from compose_sources import compose_sources
+from collector.graph.compose_discovery import read_project
+from collector.graph.compose_sources import compose_sources
 
 
 class ComposeDiscoveryTests(unittest.TestCase):

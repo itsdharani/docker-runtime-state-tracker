@@ -1,5 +1,5 @@
 """Create/update PostgreSQL container and current-status records."""
-from service_store import get_or_create_service
+from collector.database.service_store import get_or_create_service
 
 
 def get_or_create_container(cursor, container_id, name, image, labels):

@@ -49,7 +49,7 @@ In Fish, process environment variables take precedence. The collector and graph 
 set -gx NEO4J_URI "$NEO4J_URI"
 set -gx NEO4J_USERNAME "$NEO4J_USERNAME"
 set -gx NEO4J_PASSWORD "$NEO4J_PASSWORD"
-python collector/collector.py
+python -m collector
 ```
 
 If a required value is missing from both sources, the collector and graph sync report the missing setting name rather than attempting authentication with an empty-password fallback.
@@ -96,13 +96,13 @@ The collector requires access to the Docker daemon, PostgreSQL, and Neo4j. Insta
 python -m venv .venv
 . .venv/bin/activate
 pip install -r collector/requirements.txt
-python collector/collector.py
+python -m collector
 ```
 
 At startup, the collector synchronizes Compose dependencies, discovers existing containers (including stopped containers), and reconciles PostgreSQL and Neo4j runtime state. It then records Docker lifecycle events in PostgreSQL and updates the corresponding Neo4j container node. Removed containers remain in both databases with `removed` status, and lifecycle history is protected from container/service deletion. Neo4j synchronization can also be run on demand:
 
 ```sh
-python collector/graph_sync.py
+python -m collector.graph.graph_sync
 ```
 
 Synchronization is idempotent. It discovers Compose project/config paths from Docker labels and also accepts registered paths through `COMPOSE_PATHS` (or the single `COMPOSE_FILE` fallback). Multiple config files for a project are merged in label order. Service node IDs combine the Compose project namespace and service key. Every run updates nodes and relationships, stores `depends_on` conditions (`service_started` for short syntax), removes stale edges, and marks removed services undiscovered while preserving their historical container associations. An inaccessible file is reported in the collector and service detail panel; its previous graph is preserved and marked unavailable. It does not derive dependencies from container names or event order. Graph sync runs at collector startup or when invoked directly; rerun it after editing Compose configuration.
@@ -208,8 +208,8 @@ An unknown service or a service with no matching dependencies returns an empty r
 ## End-to-end demonstration
 
 1. Start PostgreSQL and Neo4j, initialize PostgreSQL as above, install Python dependencies, and export `.env` values.
-2. Run `python collector/graph_sync.py`. The default `demo/docker-compose.yml` produces `frontend → api`, `api → postgres`, and `api → redis` in Neo4j. The Compose demo currently uses short `depends_on` syntax, so those relationships use `service_started`.
-3. Start `python collector/collector.py` in a terminal. Run a container that is available on your Docker host, for example `docker run --rm --name tracker-demo-nginx -d nginx`; verify lifecycle rows in PostgreSQL:
+2. Run `python -m collector.graph.graph_sync`. The default `demo/docker-compose.yml` produces `frontend → api`, `api → postgres`, and `api → redis` in Neo4j. The Compose demo currently uses short `depends_on` syntax, so those relationships use `service_started`.
+3. Start `python -m collector` in a terminal. Run a container that is available on your Docker host, for example `docker run --rm --name tracker-demo-nginx -d nginx`; verify lifecycle rows in PostgreSQL:
 
    ```sql
    SELECT c.name, e.event_type, e.event_time
@@ -220,7 +220,7 @@ An unknown service or a service with no matching dependencies returns an empty r
 
 4. Stop it with `docker stop tracker-demo-nginx` and query again. The PostgreSQL trigger updates the associated current status when lifecycle events arrive.
 5. Open `/dependencies` or query Neo4j with `MATCH (s:Service)-[r:DEPENDS_ON]->(d:Service) RETURN s.name, r.condition, d.name ORDER BY s.name, d.name;`.
-6. Edit a `depends_on` entry in the selected Compose file and rerun `python collector/graph_sync.py`. The graph updates without duplicates and stale edges are removed.
+6. Edit a `depends_on` entry in the selected Compose file and rerun `python -m collector.graph.graph_sync`. The graph updates without duplicates and stale edges are removed.
 
 ## Preserved PostgreSQL features
 

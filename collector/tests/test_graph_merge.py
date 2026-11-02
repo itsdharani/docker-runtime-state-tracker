@@ -1,7 +1,7 @@
 import unittest
 
-from graph_sync import sync_project
-from test_fakes import RecordingSession
+from collector.graph.graph_sync import sync_project
+from collector.tests.test_fakes import RecordingSession
 
 
 class GraphMergeTests(unittest.TestCase):

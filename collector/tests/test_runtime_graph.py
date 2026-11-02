@@ -1,7 +1,7 @@
 import unittest
 
-from runtime_graph import RuntimeGraph
-from test_fakes import RecordingDriver
+from collector.graph.runtime_graph import RuntimeGraph
+from collector.tests.test_fakes import RecordingDriver
 
 
 class RuntimeGraphTests(unittest.TestCase):

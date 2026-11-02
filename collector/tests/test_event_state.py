@@ -1,6 +1,6 @@
 import unittest
 
-from event_state import event_state
+from collector.events.event_state import event_state
 
 
 class EventStateTests(unittest.TestCase):

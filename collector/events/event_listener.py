@@ -1,5 +1,5 @@
 """Listen to Docker's event stream and record container events."""
-from event_store import store_event
+from collector.events.event_store import store_event
 
 
 def listen_for_events(client, connection, runtime):

@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 
 import docker
 
-from container_store import get_or_create_container
-from runtime_graph import event_state
+from collector.database.container_store import get_or_create_container
+from collector.events.event_state import event_state
 
 
 def store_event(event, client, connection, runtime):
