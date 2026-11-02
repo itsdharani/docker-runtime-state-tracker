@@ -59,6 +59,7 @@ The file points PostgreSQL at the existing native database and uses its current 
 | Variable | Purpose |
 | --- | --- |
 | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` | PostgreSQL connection for collector and dashboard |
+| `AUTH_SECRET` | Random signing secret of at least 32 characters for dashboard sessions |
 | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | Neo4j connection for sync and server-side dashboard APIs |
 | `COMPOSE_FILE` | Registered Compose file when no labeled Compose containers are available (project ID defaults to `GRAPH_PROJECT_NAME`) |
 | `COMPOSE_PATHS` | Optional path-separated registered files; prefix entries with `project-name=` to set each project ID |
@@ -117,6 +118,16 @@ npm run dev
 ```
 
 Open <http://localhost:3000>. The overview shows current containers, `/events` shows PostgreSQL event history, and `/dependencies` shows the declared graph from Neo4j. The graph API is `/api/dependencies`; query examples are available at `/api/dependencies/query?service=api&kind=direct` (supported kinds: `direct`, `dependents`, `transitive`, `impact`).
+
+Create the first administrator once using the dashboard environment and PostgreSQL connection:
+
+```sh
+cd dashboard
+node scripts/create-user.mjs admin ADMIN
+npm run dev
+```
+
+The command prompts for a password and stores a scrypt hash. Sign in at `/login`; user administration is available to admins at `/users`. All dashboard APIs require the signed `runtime_session` cookie, and admin APIs check the role in middleware. Set `AUTH_SECRET` to a private random value of at least 32 characters.
 
 The dashboard container list is backed by PostgreSQL's current status view. The dependency page remains the declared Compose graph; standalone containers have unknown dependencies unless they are explicitly represented in Compose.
 

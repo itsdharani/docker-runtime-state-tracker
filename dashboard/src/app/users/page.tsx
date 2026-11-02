@@ -1,0 +1,12 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+type User = { user_id:number; username:string; role:string };
+export default function UsersPage() {
+  const [users,setUsers]=useState<User[]>([]); const [message,setMessage]=useState("");
+  async function load(){const response=await fetch("/api/admin/users");if(response.ok)setUsers(await response.json());else setMessage("Administrator access is required.");}
+  useEffect(()=>{const timer=setTimeout(()=>{void load()},0);return()=>clearTimeout(timer)},[]);
+  async function create(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=new FormData(event.currentTarget);const response=await fetch("/api/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:form.get("username"),password:form.get("password"),role:form.get("role")})});const result=await response.json();setMessage(response.ok?`Created ${result.username}.`:result.error);if(response.ok){event.currentTarget.reset();load();}}
+  return <main className="min-h-screen bg-slate-100 p-6 text-slate-900 md:p-10"><h1 className="text-3xl font-bold">User administration</h1><p className="mt-2 text-slate-600">Create admin and viewer accounts. Passwords are stored as scrypt hashes.</p>{message&&<p role="status" className="mt-4 rounded bg-blue-50 p-3">{message}</p>}<form onSubmit={create} className="mt-6 grid max-w-3xl gap-3 rounded-xl bg-white p-5 shadow-sm md:grid-cols-4"><input required minLength={3} maxLength={100} name="username" placeholder="Username" className="rounded border p-2"/><input required minLength={12} type="password" name="password" placeholder="Password (12+ chars)" className="rounded border p-2"/><select name="role" className="rounded border p-2"><option>VIEWER</option><option>ADMIN</option></select><button className="rounded bg-slate-900 p-2 text-white">Create user</button></form><section className="mt-6 max-w-3xl rounded-xl bg-white p-5 shadow-sm"><h2 className="font-semibold">Accounts</h2><ul className="mt-3 divide-y">{users.map(user=><li className="flex justify-between py-3" key={user.user_id}>{user.username}<span className="text-slate-500">{user.role}</span></li>)}</ul></section></main>;
+}
