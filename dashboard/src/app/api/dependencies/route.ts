@@ -12,6 +12,7 @@ export async function GET() {
       OPTIONAL MATCH (s)-[r:DEPENDS_ON]->(target:Service)
       OPTIONAL MATCH (container:Container)-[:INSTANCE_OF]->(s)
       RETURN s.service_id AS id, s.name AS name, s.project AS project,
+             s.compose_file AS source,
              collect(DISTINCT CASE WHEN target IS NULL THEN null ELSE {
                id: target.service_id, name: target.name,
                condition: r.condition
@@ -26,6 +27,7 @@ export async function GET() {
       id: record.get("id") as string,
       name: record.get("name") as string,
       project: record.get("project") as string,
+      source: record.get("source") as string | null,
       dependencies: (record.get("dependencies") as Array<{
         id: string; name: string; condition: string;
       } | null>).filter((item) => item !== null),

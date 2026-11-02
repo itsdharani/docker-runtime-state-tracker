@@ -16,6 +16,10 @@ ALTER TABLE container DROP CONSTRAINT IF EXISTS fk_container_service;
 ALTER TABLE container ADD CONSTRAINT fk_container_service
     FOREIGN KEY (service_id) REFERENCES service(service_id) ON DELETE RESTRICT;
 
+ALTER TABLE container_event DROP CONSTRAINT IF EXISTS fk_event_container;
+ALTER TABLE container_event ADD CONSTRAINT fk_event_container
+    FOREIGN KEY (container_id) REFERENCES container(container_id) ON DELETE RESTRICT;
+
 ALTER TABLE container_status DROP CONSTRAINT IF EXISTS container_status_current_state_check;
 ALTER TABLE container_status ADD CONSTRAINT container_status_current_state_check
     CHECK (current_state IN ('created', 'running', 'paused', 'restarting',

@@ -124,7 +124,7 @@ CREATE TABLE container_event (
     CONSTRAINT fk_event_container
         FOREIGN KEY (container_id)
         REFERENCES container(container_id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
 );
 -- 7. DOCKER NETWORKS
 CREATE TABLE network (

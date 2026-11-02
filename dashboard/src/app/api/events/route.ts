@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
   const container = params.get("container")?.trim() || "";
   const page = Number(params.get("page") || 1);
   const sort = params.get("sort") === "oldest" ? "ASC" : "DESC";
-  if (query.length > 120 || container.length > 120 || type.length > 80 || !Number.isInteger(page) || page < 1 || page > 10000) {
+  const from = params.get("from") || "";
+  const to = params.get("to") || "";
+  if (query.length > 120 || container.length > 120 || type.length > 80 || !Number.isInteger(page) || page < 1 || page > 10000 || (from && Number.isNaN(Date.parse(from))) || (to && Number.isNaN(Date.parse(to)))) {
     return NextResponse.json({ error: "Invalid event filters" }, { status: 400 });
   }
   try {
@@ -20,9 +22,11 @@ export async function GET(request: NextRequest) {
       WHERE ($1 = '' OR c.name ILIKE '%' || $1 || '%' OR s.name ILIKE '%' || $1 || '%' OR c.container_id ILIKE '%' || $1 || '%')
         AND ($2 = '' OR c.name ILIKE '%' || $2 || '%' OR c.container_id = $2)
         AND ($3 = 'all' OR e.event_type = $3)
+        AND ($5 = '' OR e.event_time >= $5::date)
+        AND ($6 = '' OR e.event_time < ($6::date + interval '1 day'))
       ORDER BY e.event_time ${sort}, e.event_id ${sort}
       LIMIT 50 OFFSET $4;
-    `, [query, container, type, (page - 1) * 50]);
+    `, [query, container, type, (page - 1) * 50, from, to]);
 
     return NextResponse.json({ rows: result.rows, total: Number(result.rows[0]?.total_count || 0), page, page_size: 50 });
   } catch (error) {
