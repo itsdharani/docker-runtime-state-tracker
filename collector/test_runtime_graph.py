@@ -52,7 +52,7 @@ class RuntimeGraphTests(unittest.TestCase):
         self.assertEqual(len(driver.calls), 3)
         self.assertIn("MERGE (c:Container {container_id: $id})", driver.calls[0][0])
         self.assertEqual(driver.calls[0][1]["id"], "a" * 64)
-        self.assertEqual(driver.calls[1][1]["service_id"], "runtime-tracker:api")
+        self.assertEqual(driver.calls[1][1]["service_id"], "demo:api")
 
     def test_standalone_container_does_not_gain_a_service_or_dependency(self):
         driver = RecordingDriver()

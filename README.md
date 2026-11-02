@@ -60,7 +60,8 @@ The file points PostgreSQL at the existing native database and uses its current 
 | --- | --- |
 | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` | PostgreSQL connection for collector and dashboard |
 | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | Neo4j connection for sync and server-side dashboard APIs |
-| `COMPOSE_FILE` | Compose file used as the declared dependency source (default `demo/docker-compose.yml`) |
+| `COMPOSE_FILE` | Registered Compose file when no labeled Compose containers are available (project ID defaults to `GRAPH_PROJECT_NAME`) |
+| `COMPOSE_PATHS` | Optional path-separated registered files; prefix entries with `project-name=` to set each project ID |
 | `GRAPH_PROJECT_NAME` | Stable namespace for graph service IDs (default `runtime-tracker`) |
 
 Do not replace an existing `.env` or commit credentials. Use the Neo4j credentials already configured for the running server.
@@ -101,7 +102,7 @@ At startup, the collector synchronizes the configured Compose dependency graph, 
 python collector/graph_sync.py
 ```
 
-Synchronization is idempotent. Service node IDs combine the Compose project namespace and service key. Every run updates nodes and relationships, stores `depends_on` conditions (`service_started` for short syntax), removes stale dependency edges, and removes nodes for services removed from that project's source file. It does not derive dependencies from container names or event order. Graph sync runs at collector startup or when invoked directly; rerun it after editing Compose configuration.
+Synchronization is idempotent. It discovers Compose project/config paths from Docker labels and also accepts registered paths through `COMPOSE_PATHS` (or the single `COMPOSE_FILE` fallback). Service node IDs combine the Compose project namespace and service key. Every run updates nodes and relationships, stores `depends_on` conditions (`service_started` for short syntax), removes stale dependency edges, and removes nodes for services removed from an accessible project's source file. An inaccessible file is reported and its prior graph is preserved. It does not derive dependencies from container names or event order. Graph sync runs at collector startup or when invoked directly; rerun it after editing Compose configuration.
 
 The collector creates `(:Container {container_id})` nodes using the full Docker ID. Container metadata includes name, image, current runtime `status`, `discovered_at`, `updated_at`, and Compose labels when available. Compose containers link to the namespaced `:Service` node with `:INSTANCE_OF`; replica instances remain independent. Standalone containers have no `INSTANCE_OF` link and no inferred dependencies. Container stop/removal never deletes a logical service or its `DEPENDS_ON` relationships.
 
@@ -121,7 +122,9 @@ The dashboard container list is backed by PostgreSQL's current status view. The 
 
 ## Queries
 
-Existing PostgreSQL examples are in `db/queries.sql`. For example, read event history and current status:
+The evaluation-ready SQL and Cypher collections are in [`db/demo_queries.sql`](db/demo_queries.sql), [`db/demo_queries.cypher`](db/demo_queries.cypher), and the [query guide](db/QUERY_GUIDE.md). The guide maps query sections to their purpose, expected result shape, and database concept. Read results come from live data; it does not include fabricated output. The SQL DML/DDL examples roll back their changes.
+
+Existing PostgreSQL examples are also in `db/queries.sql`. For example, read event history and current status:
 
 ```sql
 SELECT container_name, service_name, event_type, event_time
@@ -212,7 +215,7 @@ The existing service/container/status/event/network schema, service dependency t
 
 ## Limitations
 
-- The dependency source is one configured Compose file. For multiple files, set `COMPOSE_FILE` to the merged Compose configuration path or a pre-rendered configuration file; the collector does not invoke Docker Compose to merge files.
+- Docker labels identify each discovered Compose project and its configuration file. Register additional files with `COMPOSE_PATHS`; the collector reads individual YAML files and does not invoke Docker Compose to merge override files.
 - The sample Compose topology is illustrative and separate from the root database infrastructure Compose file.
 - The graph page is a hierarchical list, not a force-directed graph. It clearly shows the dependent-to-required arrow and Compose condition.
 - Event history retains structured Docker event fields in PostgreSQL, not the complete raw event payload.

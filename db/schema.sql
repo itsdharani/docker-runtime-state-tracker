@@ -11,13 +11,17 @@ CREATE TABLE app_user (
 CREATE TABLE service (
     service_id SERIAL PRIMARY KEY,
 
-    name VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+
+    compose_project VARCHAR(255) NOT NULL DEFAULT 'standalone',
 
     image VARCHAR(255),
 
     compose_file TEXT,
 
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_service_project_name UNIQUE (compose_project, name)
 );
 -- 3. SERVICE DEPENDENCIES
 -- Self-referencing relationship
@@ -67,7 +71,7 @@ CREATE TABLE container (
     CONSTRAINT fk_container_service
         FOREIGN KEY (service_id)
         REFERENCES service(service_id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
 );
 -- 5. CURRENT CONTAINER STATUS
 -- One row per container.
@@ -86,6 +90,7 @@ CREATE TABLE container_status (
                 'restarting',
                 'stopped',
                 'dead',
+                'removed',
                 'unknown'
             )
         ),

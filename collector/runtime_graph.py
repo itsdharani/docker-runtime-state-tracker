@@ -38,7 +38,8 @@ class RuntimeGraph:
         compose_project = labels.get("com.docker.compose.project")
         # graph_sync owns these namespaced service IDs. The configured project
         # is stable even if Compose's runtime project name differs.
-        service_id = f"{self.graph_project}:{compose_service}" if compose_service else None
+        project = compose_project or self.graph_project
+        service_id = f"{project}:{compose_service}" if compose_service else None
         with self.driver.session() as session:
             session.run(
                 "MERGE (c:Container {container_id: $id}) "

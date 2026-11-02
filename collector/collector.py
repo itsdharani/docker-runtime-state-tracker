@@ -73,9 +73,9 @@ def get_or_create_service(
         """
         SELECT service_id
         FROM service
-        WHERE name = %s
+        WHERE name = %s AND compose_project = %s
         """,
-        (service_name,),
+        (service_name, compose_project or "standalone"),
     )
 
     result = cursor.fetchone()
@@ -87,14 +87,19 @@ def get_or_create_service(
         """
         INSERT INTO service (
             name,
+            compose_project,
             image,
             compose_file
         )
-        VALUES (%s, %s, %s)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (compose_project, name)
+        DO UPDATE SET image = EXCLUDED.image,
+                      compose_file = COALESCE(EXCLUDED.compose_file, service.compose_file)
         RETURNING service_id
         """,
         (
             service_name,
+            compose_project or "standalone",
             image,
             compose_file,
         ),
@@ -132,9 +137,21 @@ def get_or_create_container(
     )
 
 
+    cursor.execute(
+        "SELECT service_id FROM container WHERE container_id = %s",
+        (container_id,),
+    )
+    existing = cursor.fetchone()
+
     if compose_service:
         service_name = compose_service
     else:
+        if existing:
+            cursor.execute(
+                "UPDATE container SET name = %s, image = %s WHERE container_id = %s",
+                (container_name, image, container_id),
+            )
+            return existing[0]
         service_name = container_name
 
     # Find/create service
@@ -147,20 +164,12 @@ def get_or_create_container(
         compose_file=compose_config,
     )
 
-    # Check whether container already exists
-
-    cursor.execute(
-        """
-        SELECT container_id
-        FROM container
-        WHERE container_id = %s
-        """,
-        (container_id,),
-    )
-
-    existing = cursor.fetchone()
-
     if existing:
+        cursor.execute(
+            "UPDATE container SET service_id = %s, name = %s, image = %s "
+            "WHERE container_id = %s",
+            (service_id, container_name, image, container_id),
+        )
         return service_id
 
     # Insert container
@@ -282,12 +291,6 @@ def store_event(event):
             ),
         )
 
-        if state == "removed":
-            cursor.execute(
-                "UPDATE container_status SET current_state = 'stopped', last_event_type = %s, last_updated = %s WHERE container_id = %s",
-                (action, event_timestamp.replace(tzinfo=None), container_id),
-            )
-
     pg_connection.commit()
     try:
         connect_runtime_graph().upsert_container(
@@ -392,8 +395,8 @@ def synchronize_existing_containers():
 
     with pg_connection.cursor() as cursor:
         cursor.execute(
-            "UPDATE container_status SET current_state = 'stopped', last_updated = CURRENT_TIMESTAMP "
-            "WHERE current_state IN ('running', 'restarting', 'paused', 'created') "
+            "UPDATE container_status SET current_state = 'removed', last_updated = CURRENT_TIMESTAMP "
+            "WHERE current_state <> 'removed' "
             "AND NOT (container_id = ANY(%s))",
             (active_container_ids,),
         )

@@ -127,6 +127,13 @@ BEGIN
 
         WHERE container_id = NEW.container_id;
 
+    -- A destroyed Docker object remains in the relational history.
+    ELSIF NEW.event_type = 'destroy' THEN
+        UPDATE container_status
+        SET current_state = 'removed', last_event_type = NEW.event_type,
+            last_updated = NEW.event_time
+        WHERE container_id = NEW.container_id;
+
     END IF;
 
 

@@ -10,11 +10,16 @@ export async function GET() {
     const result = await session.run(`
       MATCH (s:Service)
       OPTIONAL MATCH (s)-[r:DEPENDS_ON]->(target:Service)
+      OPTIONAL MATCH (container:Container)-[:INSTANCE_OF]->(s)
       RETURN s.service_id AS id, s.name AS name, s.project AS project,
-             collect(CASE WHEN target IS NULL THEN null ELSE {
+             collect(DISTINCT CASE WHEN target IS NULL THEN null ELSE {
                id: target.service_id, name: target.name,
                condition: r.condition
-             } END) AS dependencies
+             } END) AS dependencies,
+             collect(DISTINCT CASE WHEN container IS NULL THEN null ELSE {
+               name: container.name, status: container.status,
+               id: container.container_id
+             } END) AS containers
       ORDER BY name
     `);
     const services = result.records.map((record) => ({
@@ -24,6 +29,7 @@ export async function GET() {
       dependencies: (record.get("dependencies") as Array<{
         id: string; name: string; condition: string;
       } | null>).filter((item) => item !== null),
+      containers: (record.get("containers") as Array<{name: string; status: string; id: string} | null>).filter((item) => item !== null),
     }));
     return NextResponse.json({ services });
   } catch (error) {

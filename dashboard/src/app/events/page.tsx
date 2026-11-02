@@ -1,195 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
-type Event = {
-  container_name: string;
-  service_name: string;
-  event_type: string;
-  event_time: string;
-};
+type Event = { container_id: string; container_name: string; service_name: string; compose_project: string; event_type: string; event_time: string };
+type Result = { rows: Event[]; total: number; page: number };
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<Result>({ rows: [], total: 0, page: 1 });
+  const [query, setQuery] = useState("");
+  const [type, setType] = useState("all");
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("newest");
   const [error, setError] = useState("");
-
-  async function loadEvents() {
-    try {
-      const response = await fetch("/api/events", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch events");
-      }
-
-      const data = await response.json();
-
-      setEvents(data);
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("Unable to load event history.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    const initialLoad = setTimeout(loadEvents, 0);
-    const interval = setInterval(loadEvents, 5000);
-
-    return () => {
-      clearTimeout(initialLoad);
-      clearInterval(interval);
-    };
-  }, []);
-
-  return (
-    <main className="min-h-screen bg-gray-100 p-8 text-gray-900">
-
-      <div className="mx-auto max-w-7xl">
-
-        <div className="mb-8 flex items-center justify-between">
-
-          <div>
-            <h1 className="text-3xl font-bold">
-              Event History
-            </h1>
-
-            <p className="mt-2 text-gray-600">
-              Docker runtime events recorded by the system
-            </p>
-          </div>
-
-          <nav className="flex gap-3 text-sm font-medium">
-            <Link href="/" className="rounded-lg bg-gray-900 px-4 py-2 text-white hover:bg-gray-700">Dashboard</Link>
-            <Link href="/dependencies" className="rounded-lg bg-white px-4 py-2 shadow">Dependencies</Link>
-          </nav>
-
-        </div>
-
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-100 p-4 text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="rounded-xl bg-white shadow">
-
-          <div className="border-b p-6">
-
-            <h2 className="text-xl font-semibold">
-              Docker Event Log
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Automatically refreshed every 5 seconds
-            </p>
-
-          </div>
-
-          {loading ? (
-
-            <div className="p-6 text-gray-500">
-              Loading events...
-            </div>
-
-          ) : events.length === 0 ? (
-
-            <div className="p-6 text-gray-500">
-              No events recorded.
-            </div>
-
-          ) : (
-
-            <div className="overflow-x-auto">
-
-              <table className="w-full text-left text-sm">
-
-                <thead className="bg-gray-50 text-gray-600">
-
-                  <tr>
-
-                    <th className="px-6 py-4">
-                      Container
-                    </th>
-
-                    <th className="px-6 py-4">
-                      Service
-                    </th>
-
-                    <th className="px-6 py-4">
-                      Event
-                    </th>
-
-                    <th className="px-6 py-4">
-                      Time
-                    </th>
-
-
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {events.map((event, index) => (
-
-                    <tr
-                      key={`${event.container_name}-${event.event_time}-${index}`}
-                      className="border-t hover:bg-gray-50"
-                    >
-
-                      <td className="px-6 py-4 font-medium">
-                        {event.container_name}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {event.service_name}
-                      </td>
-
-                      <td className="px-6 py-4">
-
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            event.event_type === "start"
-                              ? "bg-green-100 text-green-700"
-                              : event.event_type === "die" ||
-                                event.event_type === "kill"
-                              ? "bg-red-100 text-red-700"
-                              : event.event_type === "stop"
-                              ? "bg-gray-200 text-gray-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          {event.event_type}
-                        </span>
-
-                      </td>
-
-                      <td className="px-6 py-4 text-gray-600">
-                        {new Date(event.event_time).toLocaleString()}
-                      </td>
-
-                    </tr>
-
-                  ))}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          )}
-
-        </div>
-
-      </div>
-
-    </main>
-  );
+    const params = new URLSearchParams({ q: query, type, page: String(page), sort });
+    fetch(`/api/events?${params}`, { cache: "no-store" }).then(async response => {
+      if (!response.ok) throw new Error();
+      setData(await response.json()); setError("");
+    }).catch(() => setError("Unable to load event history."));
+  }, [query, type, page, sort]);
+  return <main className="min-h-screen bg-slate-100 p-6 text-slate-900 md:p-10"><h1 className="text-3xl font-bold">Event history</h1><p className="mt-2 text-slate-600">Chronological Docker lifecycle records from PostgreSQL.</p>
+    <div className="my-6 flex flex-wrap gap-3"><input aria-label="Search events" className="rounded border bg-white px-3 py-2" placeholder="Search container or service" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} /><input aria-label="Filter event type" className="w-44 rounded border bg-white px-3 py-2" placeholder="Event type (any)" value={type === "all" ? "" : type} onChange={e => { setType(e.target.value || "all"); setPage(1); }} /><select aria-label="Sort events" className="rounded border bg-white px-3 py-2" value={sort} onChange={e => setSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select><span className="self-center text-sm text-slate-600">{data.total} events</span></div>
+    {error && <p role="alert" className="rounded bg-red-100 p-3 text-red-800">{error}</p>}
+    <div className="overflow-x-auto rounded-xl bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-50"><tr>{["Container", "Service", "Project", "Event", "Time"].map(label => <th className="p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map((event, index) => <tr className="border-t" key={`${event.container_id}-${event.event_time}-${index}`}><td className="p-3 font-medium">{event.container_name}</td><td className="p-3">{event.service_name}</td><td className="p-3">{event.compose_project}</td><td className="p-3"><span className="rounded-full bg-blue-50 px-2 py-1">{event.event_type}</span></td><td className="p-3">{new Date(event.event_time).toLocaleString()}</td></tr>)}</tbody></table>{data.rows.length === 0 && <p className="p-6 text-slate-500">No events match these filters.</p>}</div>
+    <div className="mt-4 flex items-center justify-between"><button className="rounded border bg-white px-3 py-2 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><span className="text-sm">Page {page}</span><button className="rounded border bg-white px-3 py-2 disabled:opacity-40" disabled={page * 50 >= data.total} onClick={() => setPage(page + 1)}>Next</button></div>
+  </main>;
 }

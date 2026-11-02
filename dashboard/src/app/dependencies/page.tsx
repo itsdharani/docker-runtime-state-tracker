@@ -1,75 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
-type Dependency = { id: string; name: string; condition: string };
-type Service = { id: string; name: string; project: string; dependencies: Dependency[] };
+type Dependency = { id:string; name:string; condition:string };
+type Instance = { id:string; name:string; status:string };
+type Service = { id:string; name:string; project:string; dependencies:Dependency[]; containers:Instance[] };
 
 export default function DependenciesPage() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetch("/api/dependencies", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load dependency graph.");
-        const data = await response.json();
-        setServices(data.services);
-      })
-      .catch(() => setError("Unable to load dependency graph. Check Neo4j configuration and synchronization."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <main className="min-h-screen bg-gray-100 p-8 text-gray-900">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Service Dependencies</h1>
-            <p className="mt-2 text-gray-600">Declared Compose dependencies stored in Neo4j</p>
-          </div>
-          <nav className="flex gap-3 text-sm font-medium">
-            <Link className="rounded-lg bg-white px-4 py-2 shadow" href="/">Overview</Link>
-            <Link className="rounded-lg bg-white px-4 py-2 shadow" href="/events">Events</Link>
-          </nav>
-        </div>
-
-        {error && <div className="mb-6 rounded-lg bg-red-100 p-4 text-red-700">{error}</div>}
-        <section className="rounded-xl bg-white shadow">
-          <div className="border-b p-6">
-            <h2 className="text-xl font-semibold">Dependency graph</h2>
-            <p className="mt-1 text-sm text-gray-500">An arrow points from a dependent service to the service it requires.</p>
-          </div>
-          {loading ? <p className="p-6 text-gray-500">Loading dependencies...</p> :
-            services.length === 0 ? <p className="p-6 text-gray-500">No services found. Synchronize a Compose file to Neo4j.</p> :
-              <ul className="divide-y">
-                {services.map((service) => (
-                  <li key={service.id} className="p-6">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white">{service.name}</span>
-                      <span className="text-sm text-gray-500">declares</span>
-                    </div>
-                    {service.dependencies.length === 0 ? (
-                      <p className="mt-3 text-sm text-gray-500">No declared dependencies</p>
-                    ) : (
-                      <ul className="ml-5 mt-3 space-y-2 border-l-2 border-blue-200 pl-5">
-                        {service.dependencies.map((dependency) => (
-                          <li key={dependency.id} className="flex flex-wrap items-center gap-2 text-sm">
-                            <span aria-hidden="true" className="text-blue-600">→</span>
-                            <span className="rounded-md bg-blue-50 px-3 py-1 font-medium text-blue-900">{dependency.name}</span>
-                            <span className="text-gray-500">({dependency.condition})</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>}
-        </section>
-        <p className="mt-4 text-xs text-gray-500">These are declared startup dependencies. They do not indicate current health or guarantee that a runtime failure propagates.</p>
-      </div>
-    </main>
-  );
+  const [services,setServices]=useState<Service[]>([]); const [selected,setSelected]=useState("");
+  const [project,setProject]=useState("all"); const [search,setSearch]=useState(""); const [zoom,setZoom]=useState(1); const [error,setError]=useState("");
+  useEffect(()=>{fetch("/api/dependencies",{cache:"no-store"}).then(async r=>{if(!r.ok)throw new Error();setServices((await r.json()).services)}).catch(()=>setError("Unable to load dependency graph. Check Neo4j configuration and synchronization."))},[]);
+  const projects=useMemo(()=>Array.from(new Set(services.map(s=>s.project))).sort(),[services]);
+  const visible=services.filter(s=>(project==="all"||s.project===project)&&`${s.project} ${s.name}`.toLowerCase().includes(search.toLowerCase()));
+  const current=services.find(s=>s.id===selected); const dependents=current?services.filter(s=>s.dependencies.some(d=>d.id===current.id)):[];
+  return <main className="min-h-screen bg-slate-100 p-6 text-slate-900 md:p-10"><h1 className="text-3xl font-bold">Dependency graph</h1><p className="mt-2 text-slate-600">Declared Compose relationships and discovered container instances in Neo4j.</p>
+    {error&&<p role="alert" className="mt-4 rounded bg-red-100 p-3 text-red-800">{error}</p>}
+    <div className="my-5 flex flex-wrap gap-3"><input aria-label="Search services" className="rounded border bg-white px-3 py-2" placeholder="Search services" value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="Filter project" className="rounded border bg-white px-3 py-2" value={project} onChange={e=>setProject(e.target.value)}><option value="all">All projects</option>{projects.map(p=><option key={p}>{p}</option>)}</select><button className="rounded border bg-white px-3" onClick={()=>setZoom(z=>Math.max(.6,z-.2))}>−</button><button className="rounded border bg-white px-3" onClick={()=>setZoom(1)}>Fit</button><button className="rounded border bg-white px-3" onClick={()=>setZoom(z=>Math.min(1.8,z+.2))}>+</button><span className="self-center text-sm text-slate-500">Zoom {Math.round(zoom*100)}%</span></div>
+    <div className="grid gap-5 xl:grid-cols-[1fr_20rem]"><section className="overflow-auto rounded-xl bg-white p-5 shadow-sm"><div className="mb-4 flex gap-4 text-xs text-slate-600"><span>■ Service</span><span>● Running instance</span><span>○ Stopped instance</span><span>→ Depends on</span></div><div style={{transform:`scale(${zoom})`,transformOrigin:"top left"}} className="grid min-w-[42rem] grid-cols-2 gap-4 md:grid-cols-3">{visible.map(service=><button key={service.id} onClick={()=>setSelected(service.id)} className={`min-h-28 rounded-xl border p-4 text-left ${selected===service.id?"border-blue-500 bg-blue-50":"border-slate-200 bg-slate-50"}`}><span className="block font-semibold">{service.name}</span><span className="text-xs text-slate-500">{service.project}</span><div className="mt-3 flex flex-wrap gap-1">{service.containers.map(c=><span key={c.id} title={`${c.name}: ${c.status}`} className={`rounded-full px-2 py-1 text-xs ${c.status==="running"?"bg-green-100 text-green-800":"bg-slate-200 text-slate-700"}`}>{c.name}</span>)}</div><div className="mt-2 text-xs text-blue-700">{service.dependencies.length?`→ ${service.dependencies.map(d=>d.name).join(", ")}`:"Independent service"}</div></button>)}</div>{visible.length===0&&<p className="p-8 text-slate-500">No matching discovered services.</p>}</section>
+    <aside className="rounded-xl bg-white p-5 shadow-sm"><h2 className="font-semibold">Service details</h2>{current?<><p className="mt-3 text-lg font-medium">{current.name}</p><p className="text-sm text-slate-500">{current.project}</p><h3 className="mt-5 text-sm font-semibold">Direct dependencies</h3><ul className="mt-2 text-sm">{current.dependencies.map(d=><li key={d.id}>{d.name} · {d.condition}</li>)}</ul><h3 className="mt-4 text-sm font-semibold">Direct dependents</h3><ul className="mt-2 text-sm">{dependents.map(s=><li key={s.id}>{s.name}</li>)}</ul><h3 className="mt-4 text-sm font-semibold">Instances</h3><ul className="mt-2 text-sm">{current.containers.map(c=><li key={c.id}>{c.name} · {c.status}</li>)}</ul><p className="mt-4 text-xs text-slate-500">Source: {current.project} Compose configuration</p></>:<p className="mt-3 text-sm text-slate-500">Select a service to inspect its relationships.</p>}</aside></div>
+    <p className="mt-4 text-xs text-slate-500">Arrows point from a service to the service it requires. Runtime health does not guarantee whether failure will propagate.</p>
+  </main>;
 }

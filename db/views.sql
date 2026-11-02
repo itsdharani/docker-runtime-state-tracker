@@ -10,7 +10,9 @@ SELECT
     cs.current_state,
     cs.last_event_type,
     cs.restart_count,
-    cs.last_updated
+    cs.last_updated,
+    s.compose_project,
+    s.compose_file
 FROM container c
 JOIN service s
     ON c.service_id = s.service_id

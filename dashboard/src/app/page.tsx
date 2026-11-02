@@ -2,243 +2,27 @@
 
 import { useEffect, useState } from "react";
 
-type Container = {
-  container_id: string;
-  container_name: string;
-  service_name: string;
-  service_image: string;
-  container_image: string;
-  current_state: string;
-  last_event_type: string | null;
-  restart_count: number;
-  last_updated: string;
-};
+type Row = { container_id:string; container_name:string; service_name:string; compose_project:string; container_image:string; current_state:string; restart_count:number; last_updated:string };
+type Overview = { total:string; running:string; stopped:string; errors:string; services:string; projects:string; recent_events:{container_name:string;service_name:string;event_type:string;event_time:string}[] };
+type Containers = { rows:Row[]; total:number };
 
 export default function Home() {
-  const [containers, setContainers] = useState<Container[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [data, setData] = useState<Containers>({rows:[],total:0});
+  const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-
-  async function loadContainers() {
-    try {
-      const response = await fetch("/api/containers", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch containers");
-      }
-
-      const data = await response.json();
-      setContainers(data);
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("Unable to load container data.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    const initialLoad = setTimeout(loadContainers, 0);
-    const interval = setInterval(loadContainers, 5000);
-
-    return () => {
-      clearTimeout(initialLoad);
-      clearInterval(interval);
-    };
+    fetch("/api/overview", {cache:"no-store"}).then(async r => { if (!r.ok) throw new Error(); setOverview(await r.json()); }).catch(() => setError("Could not load overview statistics."));
   }, []);
-
-  const running = containers.filter(
-    (c) => c.current_state === "running"
-  ).length;
-
-  const stopped = containers.filter(
-    (c) => c.current_state === "stopped"
-  ).length;
-
-  const restarting = containers.filter(
-    (c) => c.current_state === "restarting"
-  ).length;
-
-  const totalRestarts = containers.reduce(
-    (sum, c) => sum + Number(c.restart_count || 0),
-    0
-  );
-
-  return (
-    <main className="min-h-screen bg-gray-100 p-8 text-gray-900">
-      <div className="mx-auto max-w-7xl">
-
-        <div className="mb-8">
-          <nav className="mb-4 flex gap-3 text-sm font-medium">
-            <a className="rounded-lg bg-white px-4 py-2 shadow" href="/events">Event history</a>
-            <a className="rounded-lg bg-white px-4 py-2 shadow" href="/dependencies">Dependencies</a>
-          </nav>
-          <h1 className="text-3xl font-bold">
-            Docker Runtime Tracker
-          </h1>
-
-          <p className="mt-2 text-gray-600">
-            Real-time container state and runtime event monitoring
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-100 p-4 text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-
-          <div className="rounded-xl bg-white p-6 shadow">
-            <p className="text-sm text-gray-500">
-              Total Containers
-            </p>
-
-            <p className="mt-2 text-3xl font-bold">
-              {containers.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow">
-            <p className="text-sm text-gray-500">
-              Running
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-green-600">
-              {running}
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow">
-            <p className="text-sm text-gray-500">
-              Stopped
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-gray-600">
-              {stopped}
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow">
-            <p className="text-sm text-gray-500">
-              Total Restarts
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-orange-600">
-              {totalRestarts}
-            </p>
-          </div>
-
-        </div>
-
-        <div className="rounded-xl bg-white shadow">
-
-          <div className="border-b p-6">
-            <h2 className="text-xl font-semibold">
-              Container Status
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Automatically refreshed every 5 seconds
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              Dependency relationships are declared for Compose services. Standalone containers have unknown dependencies.
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="p-6 text-gray-500">
-              Loading container data...
-            </div>
-          ) : containers.length === 0 ? (
-            <div className="p-6 text-gray-500">
-              No containers found.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-
-              <table className="w-full text-left text-sm">
-
-                <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="px-6 py-4">Container</th>
-                    <th className="px-6 py-4">Service</th>
-                    <th className="px-6 py-4">Image</th>
-                    <th className="px-6 py-4">State</th>
-                    <th className="px-6 py-4">Last Event</th>
-                    <th className="px-6 py-4">Restarts</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-
-                  {containers.map((container) => (
-
-                    <tr
-                      key={container.container_id}
-                      className="border-t hover:bg-gray-50"
-                    >
-
-                      <td className="px-6 py-4 font-medium">
-                        {container.container_name}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {container.service_name}
-                      </td>
-
-                      <td className="px-6 py-4 text-gray-600">
-                        {container.container_image}
-                      </td>
-
-                      <td className="px-6 py-4">
-
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            container.current_state === "running"
-                              ? "bg-green-100 text-green-700"
-                              : container.current_state === "stopped"
-                              ? "bg-gray-200 text-gray-700"
-                              : "bg-orange-100 text-orange-700"
-                          }`}
-                        >
-                          {container.current_state}
-                        </span>
-
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {container.last_event_type || "-"}
-                      </td>
-
-                      <td className="px-6 py-4 font-medium">
-                        {container.restart_count}
-                      </td>
-
-                    </tr>
-
-                  ))}
-
-                </tbody>
-
-              </table>
-
-            </div>
-          )}
-
-        </div>
-
-        <div className="mt-4 text-right text-xs text-gray-500">
-          {restarting > 0
-            ? `${restarting} container(s) restarting`
-            : "System monitored through Docker events"}
-        </div>
-
-      </div>
-    </main>
-  );
+  useEffect(() => {
+    const params = new URLSearchParams({q:query,page:"1"});
+    fetch(`/api/containers?${params}`, {cache:"no-store"}).then(async r => { if (!r.ok) throw new Error(); setData(await r.json()); }).catch(() => setError("Could not load container rows."));
+  }, [query]);
+  const cards = [["Containers",overview?.total],["Running",overview?.running],["Stopped / removed",overview?.stopped],["Services",overview?.services],["Compose projects",overview?.projects],["Errors / unknown",overview?.errors]];
+  return <main className="min-h-screen bg-slate-100 p-6 text-slate-900 md:p-10"><h1 className="text-3xl font-bold">Overview</h1><p className="mt-2 text-slate-600">Current Docker runtime state and recent lifecycle activity.</p>
+    {error && <p role="alert" className="mt-4 rounded bg-red-100 p-3 text-red-800">{error}</p>}
+    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{cards.map(([label,value]) => <article key={label} className="rounded-xl bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-semibold">{value ?? "—"}</p></article>)}</section>
+    <section className="mt-8 grid gap-6 xl:grid-cols-3"><div className="overflow-hidden rounded-xl bg-white shadow-sm xl:col-span-2"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div><h2 className="text-xl font-semibold">Containers</h2><p className="text-sm text-slate-500">{data.total} discovered records</p></div><input aria-label="Search containers" className="rounded border px-3 py-2" placeholder="Search name, ID, service..." value={query} onChange={e=>setQuery(e.target.value)}/></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50"><tr>{["Container","Service / project","Image","State","Updated"].map(x=><th className="p-3" key={x}>{x}</th>)}</tr></thead><tbody>{data.rows.map(row=><tr className="border-t" key={row.container_id}><td className="p-3 font-medium">{row.container_name}<span className="block font-mono text-xs text-slate-500">{row.container_id.slice(0,12)}</span></td><td className="p-3">{row.service_name}<span className="block text-xs text-slate-500">{row.compose_project}</span></td><td className="max-w-48 truncate p-3">{row.container_image}</td><td className="p-3">{row.current_state}</td><td className="p-3">{new Date(row.last_updated).toLocaleString()}</td></tr>)}</tbody></table>{data.rows.length===0&&<p className="p-6 text-slate-500">No containers found.</p>}</div></div>
+      <div className="rounded-xl bg-white shadow-sm"><div className="border-b p-5"><h2 className="text-xl font-semibold">Recent events</h2></div><ul className="divide-y">{(overview?.recent_events||[]).map((event,index)=><li className="p-4" key={`${event.container_name}-${event.event_time}-${index}`}><div className="flex justify-between gap-2"><span className="font-medium">{event.container_name}</span><span className="text-sm text-blue-700">{event.event_type}</span></div><p className="mt-1 text-xs text-slate-500">{event.service_name} · {new Date(event.event_time).toLocaleString()}</p></li>)}</ul>{overview?.recent_events.length===0&&<p className="p-5 text-sm text-slate-500">No events recorded.</p>}</div></section>
+  </main>;
 }
